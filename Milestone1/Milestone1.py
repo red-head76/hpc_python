@@ -43,28 +43,27 @@ class Simulation(object):
         """
         Calculates the velocity density v(x, y) for a given probability density f(v, x, y)
         """
-        return (1 / self.rho(self.f) *
+        return ((1 / self.rho())[..., np.newaxis] *
                 np.sum((self.f[..., np.newaxis] * self.c[:, np.newaxis, np.newaxis, :]), axis=0))
 
-    def streaming(self, direction: int):
+    def streaming(self):
         """
         Shifts the positions in the probability density f(v, x, y) in the given direction
         direction is multiplied with (1, -1) to make 'up' the positive y-direction
 
-        Args:
-        direction (int): the direction the streaming should go to. It is the index of the
-        velocity-direction array self.c.
         """
-        self.f = np.roll(self.f, self.c[direction] * (1, -1), axis=(2, 1))
+        # velocity is multiplied with (1, -1) to make the positive y-direction pointing upwards
+        for i, direction in enumerate(self.c):
+            self.f[i] = np.roll(self.f[i], direction * (1, -1), axis=(1, 0))
 
-    def propagate(self, direction):
+    def propagate(self):
         """
         Propagates the density f in time and stores the positions in rho_t
         """
         for t in self.t:
             # choose in which direction to go
             self.rho_t[t] = self.rho()
-            self.streaming(direction)
+            self.streaming()
 
     def animate_rho_t(self, save=False):
         fig, ax = plt.subplots()
@@ -75,14 +74,14 @@ class Simulation(object):
                 ax.imshow(self.rho_t[i])  # show an initial one instead of white background
             ims.append([im])
 
-        ani = animation.ArtistAnimation(fig, ims, repeat_delay=300)
+        ani = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
         if save:
-            writer = animation.FFMpegWriter(fps=5)
+            writer = animation.FFMpegWriter(fps=20)
             ani.save("flow.gif", writer=writer)
         plt.show()
         plt.close()
 
 
-sim = Simulation(t_range=30)
-sim.propagate(5)
-sim.animate_rho_t(save=True)
+sim = Simulation(t_range=100, x_range=11, y_range=13)
+sim.propagate()
+sim.animate_rho_t(save=False)
