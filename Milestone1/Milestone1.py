@@ -65,6 +65,9 @@ class Simulation(object):
             self.rho_t[t] = self.rho()
             self.streaming()
 
+    def save_rho_t(self, filename):
+        np.save(filename, self.rho_t)
+
     def animate_rho_t(self, save=False):
         fig, ax = plt.subplots()
         ims = []
@@ -82,6 +85,7 @@ class Simulation(object):
         plt.close()
 
 
-sim = Simulation(t_range=100, x_range=11, y_range=13)
-sim.propagate()
-sim.animate_rho_t(save=False)
+sim = Simulation(t_range=30)
+sim.propagate(5)
+# sim.animate_rho_t(save=True)
+sim.save_rho_t("./test_rho_t")
