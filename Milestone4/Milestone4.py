@@ -13,7 +13,7 @@ class Simulation(object):
     """
 
     def __init__(self, f=None, x_range=15, y_range=10, t_range=100, omega=0.1,
-                 dry_nodes=None, dry_velocities=None, seed=None):
+                 dry_nodes=None, dry_velocities=None, seed=None, p_out=2, delta_p=1):
         super(Simulation, self).__init__()
 
         # density function f(v, x, y) with size
@@ -51,6 +51,10 @@ class Simulation(object):
 
         # The collision frequency
         self.omega = omega
+
+        # Pressure values
+        self.p_out = p_out
+        self.delta_p = delta_p
 
         # The dry nodes grid
         # If not given, then don't place any walls
@@ -108,7 +112,7 @@ class Simulation(object):
         for i, direction in enumerate(self.c):
             self.f[i] = np.roll(self.f[i], direction * (1, -1), axis=(1, 0))
 
-    def bounce(self):
+    def handle_walls(self):
         """
         Shifts the positions of the probability density f(v, x, y) according to the given
         boundaries with dry_nodes and dry_velocities
@@ -130,9 +134,20 @@ class Simulation(object):
         # Replace the entries which are not nan in the copy in the original f
         np.copyto(self.f, f_copy, where=~np.isnan(f_copy))
 
-    def f_eq(self):
+    def poisson_flow(self):
+        # cs^2 = 1/3
+        rho_in = np.ones((self.x_range, self.y_range)) * (self.p_out - self.delta_p) * 3
+        rho_out = np.ones((self.x_range, self.y_range)) * self.p_out * 3
+        self.f[:, :, 0] = self.f_eq(rho_in)[:, :, -2] + (self.f[:, :, -2] - self.f_eq[:, :, -2])
+        self.f[:, :, -1] = self.f_eq(rho_out)[:, :, 1] + (self.f[:, :, 1] - self.f_eq[:, :, 1])
+
+    def f_eq(self, rho=None, v=None):
         w = np.array([16, 4, 4, 4, 4, 1, 1, 1, 1]) / 36
-        v = self.v()
+        if rho is None:
+            rho = self.rho()
+        if v is None:
+            v = self.v()
+
         # w * rho
         w_rho = np.einsum('c, xy -> cxy', w, self.rho())
         # c * v
@@ -157,9 +172,11 @@ class Simulation(object):
             # do a streaming step
             self.streaming()
             # apply boundary conditions (walls)
-            self.bounce()
+            self.handle_walls()
             # do a collision step
             self.collision()
+            # do poisson flow
+            self.poisson_flow()
 
     def calc_rho_t(self):
         """
